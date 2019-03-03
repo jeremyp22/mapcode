@@ -1,0 +1,299 @@
+
+<!--
+  ~ Copyright (C) 2016, Stichting Mapcode Foundation (http://www.mapcode.com)
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~    http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<html>
+<meta name="viewport" content="initial-scale=1.0">
+<head>
+    <title>Mapcode REST API</title>
+    <style type="text/css">
+        body {
+            margin: 5px 10px 5px 10px;
+            font-family: verdana, geneva, arial, helvetica, sans-serif;
+            font-size: 12px;
+            background-color: #eeeeee;
+            text-decoration: none;
+            font-weight: normal;
+            line-height: normal;
+        }
+
+
+        textarea {
+          position: absolute;
+          top: -9999px;
+        }
+        form {
+          -moz-appearance: none;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+    </style>
+</head>
+
+<body onload="onLoad()">
+<h1>Co-ordinates Converter</h1>
+
+<hr/>
+
+<!--
+ ~ --------------------------------------------------------------------------------
+ ~ UTILITY FUNCTIONS
+ ~ --------------------------------------------------------------------------------
+-->
+
+<script type="text/javascript">
+
+    /* This is the base URL of the mapcode REST API. */
+    var apiBaseURL = "https://api.mapcode.com/mapcode";
+
+    // For local testing, use:
+    // var apiBaseURL = "http://localhost:8080/mapcode";
+
+    function onLoad() {
+        var url = apiBaseURL + "/version";
+        var httpRequest = new XMLHttpRequest();
+        httpRequest.onreadystatechange = function () {
+            if (httpRequest.readyState == 4) {
+              //  versionResponseReady(httpRequest.responseText, httpRequest.status);
+            }
+        };
+        httpRequest.open("GET", url, true);
+        httpRequest.setRequestHeader('Accept', 'application/json');
+        httpRequest.send();
+    }
+
+    function versionResponseReady(response, status) {
+        if ((status == 200) && response) {
+            var result = JSON.parse(response);
+            document.getElementById("version").innerHTML = result.version;
+        }
+    }
+
+    function createResponseLine(status, result) {
+        return "<small>" + ((status == 200) ? "<font color=\"#228800\">" : "<font color=\"cc2222\">") +
+            "<b>Response:<" + "/b><br><tt>" + result + "<" + "/tt><" + "/font><" + "/small><" + "/font><br/><br/>";
+    }
+
+    function createRequestLine(request) {
+        return "<font color=\"#228800\"><small><b>Request:<" + "/b><br><tt>HTTP GET " + request + "<" + "/tt><" + "/small><" + "/font><br/><br/>";
+
+    }
+
+    function createTerritoryLine(territory) {
+        var line = "<b>" + territory.alphaCode + "<" + "/b> - <u>" + territory.fullName + "<" + "/u>";
+        if (territory.fullNameAliases) {
+            for (j = 0; j < territory.fullNameAliases.length; j++) {
+                line += ", " + territory.fullNameAliases[j];
+            }
+        }
+        if (territory.aliases) {
+            line += ", also known as: ";
+            for (j = 0; j < territory.aliases.length; j++) {
+                line += territory.aliases[j] + " ";
+            }
+        }
+        return line;
+    }
+
+    function createAlphabetLine(alphabet) {
+        return "<b>" + alphabet.name + "<" + "/b><" + "/u>";
+    }
+</script>
+
+<!--
+ ~ --------------------------------------------------------------------------------
+ ~ ENCODE LAT/LON TO MAPCODE
+ ~ --------------------------------------------------------------------------------
+-->
+
+<script type="text/javascript">
+  function pasteButtonPressed() {
+
+    var latlon = document.getElementById("latlon");
+    latlon.focus();
+    document.execCommand("paste");
+
+  }
+  function copyButtonPressed() {
+
+      Clipboard.copy(document.getElementById("resultEncode").value);
+
+  }
+
+    function encodeButtonPressed() {
+        document.getElementById("resultEncode").innerHTML = "<font color=grey>Waiting...<" + "/font>";
+
+        /* Use the input fields to build the request URL. */
+        var territory = document.getElementById("territoryEncode").value;
+        var precision = document.getElementById("precision").value;
+        var alphabet = document.getElementById("alphabetEncode").value;
+        var latlon = document.getElementById("latlon").value;
+
+        //remove any brackets
+        latlon = latlon.replace(/[{()}]/g, '');
+
+        document.getElementById("latlon").value = latlon;
+
+        /* Add include=territory,alphabet to make sure the territory and alphabet values are always present. */
+        var url = apiBaseURL + "/codes/" + latlon + //"/local";// +
+        "?include=territory,alphabet" +
+            ((territory && (territory.length !== 0)) ? "&territory=" + territory : "") +
+            ((precision && (precision.length !== 0)) ? "&precision=" + precision : "") +
+            ((alphabet && (alphabet.length !== 0)) ? "&alphabet=" + alphabet : "") +
+            "&allowLog=true&client=web";
+        document.getElementById("requestEncode").innerHTML = createRequestLine(url);
+
+        /* Asynchronously request a solution, call encodeResponseReady when done. */
+        var httpRequest = new XMLHttpRequest();
+        httpRequest.onreadystatechange = function () {
+            if (httpRequest.readyState == 4) {
+                encodeResponseReady(httpRequest.responseText, httpRequest.status);
+            }
+        };
+        httpRequest.open("GET", url, true);
+        httpRequest.setRequestHeader('Accept', 'application/json');
+        httpRequest.send();
+    }
+
+    function encodeResponseReady(response, status) {
+
+        var resultText = document.getElementById("resultEncode");
+        /* Did the request succeed? */
+        document.getElementById("responseEncode").innerHTML = createResponseLine(status, response);
+        if ((status == 200) && response) {
+
+            /* Parse the response into an array of mapcodes. */
+            var result = JSON.parse(response);
+
+            /* Only print the first mapcode */
+            resultText.value = result.mapcodes[0].mapcodeInAlphabet;
+        }
+        else {
+            resultText.value = "<b>Error<" + "/b> (status = " + status + ")";
+        }
+    }
+    function encodeResponseReadyORIGINAL (response, status) {
+
+        /* Did the request succeed? */
+        document.getElementById("responseEncode").innerHTML = createResponseLine(status, response);
+        if ((status == 200) && response) {
+
+            /* Parse the response into an array of mapcodes. */
+            var result = JSON.parse(response);
+
+            /* Print the mapcodes, grey them if they are not the shortest (i.e. the first) in a territory. */
+            var resultLines = "<b><u>There are " + result.mapcodes.length + " possible mapcodes:<" + "/b><" + "/u><br><tt>";
+            for (i = 0; i < result.mapcodes.length; i++) {
+                var isGrey = ((i > 0) && (result.mapcodes[i].territory == result.mapcodes[i - 1].territory));
+                if (isGrey) {
+                    resultLines += "<font color=\"#888888\">";
+                }
+                resultLines += ((result.mapcodes[i].territory == "AAA") ? "" :
+                    result.mapcodes[i].territoryInAlphabet + " ") + "<b>" + result.mapcodes[i].mapcodeInAlphabet + "<" + "/b> ";
+
+                if (result.mapcodes[i].mapcode != result.mapcodes[i].mapcodeInAlphabet) {
+                    resultLines += " (" + ((result.mapcodes[i].territory == "AAA") ? "" :
+                        result.mapcodes[i].territory + " ") + result.mapcodes[i].mapcode + ") ";
+                }
+
+                if (result.mapcodes[i].territory == "AAA") {
+                    resultLines += "(international)";
+                }
+                if (isGrey) {
+                    resultLines += "<" + "/font>";
+                }
+                resultLines += "<br/>"
+            }
+            resultLines += "<" + "/tt>";
+            document.getElementById("resultEncode").innerHTML = resultLines;
+        }
+        else {
+            document.getElementById("resultEncode").innerHTML = "<b>Error<" + "/b> (status = " + status + ")";
+        }
+    }
+    window.Clipboard = (function(window, document, navigator) {
+        var textArea,
+            copy;
+
+        function isOS() {
+            return navigator.userAgent.match(/ipad|iphone/i);
+        }
+
+        function createTextArea(text) {
+            textArea = document.createElement('textArea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            //position: absolute;
+//          top: -9999px
+        }
+
+        function selectText() {
+            var range,
+                selection;
+
+            if (isOS()) {
+                range = document.createRange();
+                range.selectNodeContents(textArea);
+                selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                textArea.setSelectionRange(0, 999999);
+            } else {
+                textArea.select();
+            }
+        }
+
+        function copyToClipboard() {
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
+
+        copy = function(text) {
+            createTextArea(text);
+            selectText();
+            copyToClipboard();
+        };
+
+        return {
+            copy: copy
+        };
+    })(window, document, navigator);
+
+
+</script>
+
+
+<form action="#" onsubmit="return encodeButtonPressed();">
+
+    <input type="text" id="latlon" value="">
+    <input type="hidden" id="territoryEncode" value="GBR">
+    <br/>
+    <input type="hidden" id="alphabetEncode" value="">
+    <input type="hidden" id="precision" value="">
+    <input type="button" value="Encode" onclick="encodeButtonPressed()">
+
+<br/>
+<input type="text" id="resultEncode">
+<br/>
+    <input type="button" value="Copy" onclick="copyButtonPressed()">
+<div id="requestEncode" style="visibility: hidden"></div>
+<div id="responseEncode" style="visibility: hidden"></div>
+
+<hr/>
+</form>
+</body>
+</html>
