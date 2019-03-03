@@ -74,6 +74,12 @@
         httpRequest.open("GET", url, true);
         httpRequest.setRequestHeader('Accept', 'application/json');
         httpRequest.send();
+      
+      
+
+        var urlParams = new URLSearchParams(location.search);
+        var latlon = document.getElementById("latlon").value= urlParams.get('val');  // true
+
     }
 
     function versionResponseReady(response, status) {
